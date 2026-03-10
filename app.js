@@ -218,7 +218,7 @@
 
     function countOtherActiveAlerts(cache) {
         if (!currentUser || !cache) return 0;
-        return Object.values(cache).filter(a => a && a.userId !== currentUser.id && a.active).length;
+        return Object.values(cache).filter(a => a && a.userId !== currentUser.id && a.active === true).length;
     }
 
     function renderDashboard() {
@@ -226,8 +226,8 @@
         
         const safeCache = alertsCache || {};
         const alertsList = Object.entries(safeCache).map(([key, val]) => ({ ...val, firebaseKey: key }));
-        const myAlert = alertsList.find(a => a && a.userId === currentUser.id && a.active);
-        const otherAlerts = alertsList.filter(a => a && a.userId !== currentUser.id && a.active);
+        const myAlert = alertsList.find(a => a && a.userId === currentUser.id && a.active === true);
+        const otherAlerts = alertsList.filter(a => a && a.userId !== currentUser.id && a.active === true);
 
         // My alarm banner
         const banner = $('my-alarm-banner');
@@ -282,10 +282,17 @@
             }
         }
 
-        // If no alerts at all
-        if (!myAlert && otherAlerts.length === 0) {
-            $('alarm-overlay').classList.add('hidden');
-            SoundManager.stopSiren();
+        // Extremely aggressive stop check: if NO alerts are active for this user (neither myAlert nor unresponded otherAlerts)
+        if (!myAlert) {
+            const hasActivesUnresponded = otherAlerts.some(a => {
+                const rs = a.responses ? Object.values(a.responses) : [];
+                return !rs.some(r => r.userId === currentUser.id);
+            });
+            
+            if (!hasActivesUnresponded) {
+                $('alarm-overlay').classList.add('hidden');
+                SoundManager.stopSiren();
+            }
         }
 
         // Update page title to attract attention
