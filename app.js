@@ -30,9 +30,17 @@
 
     // ===== Sound Manager =====
     const SoundManager = {
-        ctx: null, playing: false, nodes: [],
-        init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+        ctx: null, playing: false, nodes: [], userInteracted: false,
+        init() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        },
         startSiren() {
+            if (!this.userInteracted) return;
             this.init();
             if (this.playing) return;
             this.playing = true;
@@ -62,6 +70,10 @@
             this.nodes = [];
         }
     };
+
+    // Mark user interaction on ANY click/touch so audio can play
+    document.addEventListener('click', () => { SoundManager.userInteracted = true; }, { once: false });
+    document.addEventListener('touchstart', () => { SoundManager.userInteracted = true; }, { once: false });
 
     // ===== DOM =====
     const $ = id => document.getElementById(id);
@@ -94,9 +106,8 @@
             const data = snap.val();
             if (!data) { toast('Usuario no encontrado', 'danger', '❌'); return; }
             const key = Object.keys(data)[0];
-            const user = data[key];
+            const user = { ...data[key], id: key };
             if (user.password !== password) { toast('Contraseña incorrecta', 'danger', '❌'); return; }
-            user.id = key;
             saveSession(user);
             $('form-login').reset();
             enterDashboard(user);
@@ -114,9 +125,9 @@
         usersRef.orderByChild('username').equalTo(username).once('value', snap => {
             if (snap.val()) { toast('Ese nombre de usuario ya existe', 'danger', '❌'); return; }
             const newRef = usersRef.push();
-            const user = { name, address, username, password };
-            newRef.set(user);
-            user.id = newRef.key;
+            const userData = { name, address, username, password };
+            newRef.set(userData);
+            const user = { ...userData, id: newRef.key };
             saveSession(user);
             $('form-register').reset();
             toast('¡Cuenta creada exitosamente!', 'success', '✅');
@@ -127,6 +138,8 @@
     $('btn-logout').addEventListener('click', () => {
         SoundManager.stopSiren();
         $('alarm-overlay').classList.add('hidden');
+        if (activeListener) { alertsRef.off('value', activeListener); activeListener = null; }
+        currentUser = null;
         clearSession();
         showView('login');
     });
@@ -134,6 +147,8 @@
     // ===== Dashboard =====
     let currentUser = null;
     let alertsCache = {};
+    let activeListener = null;
+    let previousAlertCount = 0;
 
     function enterDashboard(user) {
         currentUser = user;
@@ -144,10 +159,31 @@
 
     // ===== Real-time listener =====
     function listenToAlerts() {
-        alertsRef.on('value', snap => {
-            alertsCache = snap.val() || {};
+        // Remove previous listener to prevent duplicates
+        if (activeListener) { alertsRef.off('value', activeListener); }
+
+        activeListener = alertsRef.on('value', snap => {
+            const newCache = snap.val() || {};
+            const oldActiveCount = countOtherActiveAlerts(alertsCache);
+            alertsCache = newCache;
+            const newActiveCount = countOtherActiveAlerts(alertsCache);
+
+            // Show toast for new alerts arriving
+            if (newActiveCount > oldActiveCount && oldActiveCount >= 0) {
+                const diff = newActiveCount - oldActiveCount;
+                if (diff > 0 && previousAlertCount > 0) {
+                    toast(`🚨 ¡${diff} nueva${diff > 1 ? 's' : ''} alerta${diff > 1 ? 's' : ''} de emergencia!`, 'danger', '🔔');
+                }
+            }
+            previousAlertCount = newActiveCount;
+
             renderDashboard();
         });
+    }
+
+    function countOtherActiveAlerts(cache) {
+        if (!currentUser) return 0;
+        return Object.values(cache).filter(a => a.userId !== currentUser.id && a.active).length;
     }
 
     function renderDashboard() {
@@ -198,6 +234,13 @@
         if (!myAlert && otherAlerts.length === 0) {
             $('alarm-overlay').classList.add('hidden');
             SoundManager.stopSiren();
+        }
+
+        // Update page title to attract attention
+        if (myAlert || otherAlerts.length > 0) {
+            document.title = '🚨 ¡ALERTA! - Alarma Comunitaria';
+        } else {
+            document.title = 'Alarma Comunitaria | Protege tu Vecindario';
         }
     }
 
@@ -410,7 +453,21 @@
 
     // ===== Init =====
     const session = getSession();
-    if (session) { enterDashboard(session); }
-    else { showView('login'); }
+    if (session && session.id) {
+        // Validate session: re-fetch user from Firebase to ensure ID is correct
+        usersRef.child(session.id).once('value', snap => {
+            if (snap.val()) {
+                enterDashboard(session);
+            } else {
+                // Old session with invalid ID, force re-login
+                clearSession();
+                showView('login');
+                toast('Tu sesión expiró. Inicia sesión nuevamente.', 'info', 'ℹ️');
+            }
+        });
+    } else {
+        clearSession();
+        showView('login');
+    }
 
 })();
