@@ -408,12 +408,28 @@
 
     // ===== Deactivate =====
     $('btn-deactivate').addEventListener('click', () => {
-        const alertsList = Object.entries(alertsCache).map(([k, v]) => ({ ...v, firebaseKey: k }));
-        const myAlert = alertsList.find(a => a.userId === currentUser.id && a.active);
-        if (myAlert) {
-            alertsRef.child(myAlert.firebaseKey).update({ active: false });
-            toast('Alarma desactivada', 'success', '✅');
-        }
+        const btn = $('btn-deactivate');
+        btn.disabled = true;
+        
+        alertsRef.once('value', snap => {
+            btn.disabled = false;
+            const alerts = snap.val() || {};
+            const myActiveAlert = Object.entries(alerts).find(([k, v]) => v.userId === currentUser.id && v.active);
+            
+            if (myActiveAlert) {
+                alertsRef.child(myActiveAlert[0]).update({ active: false }).then(() => {
+                    toast('Alarma desactivada', 'success', '✅');
+                }).catch(err => {
+                    toast('Error al desactivar', 'danger', '❌');
+                    console.error(err);
+                });
+            } else {
+                toast('No tienes ninguna alarma activa para desactivar', 'info', 'ℹ️');
+            }
+        }).catch(err => {
+            btn.disabled = false;
+            toast('Error de conexión', 'danger', '❌');
+        });
     });
 
     // ===== Detail Modal =====
