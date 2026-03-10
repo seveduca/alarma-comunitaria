@@ -393,6 +393,9 @@
 
     $('btn-confirm-alert').addEventListener('click', () => {
         if (!selectedCause) return;
+        const btn = $('btn-confirm-alert');
+        btn.disabled = true;
+        
         const newAlertRef = alertsRef.push();
         newAlertRef.set({
             userId: currentUser.id,
@@ -401,9 +404,15 @@
             cause: selectedCause,
             timestamp: Date.now(),
             active: true
+        }).then(() => {
+            btn.disabled = false;
+            $('modal-alert').classList.add('hidden');
+            toast('¡Alarma activada! Tu comunidad ha sido alertada.', 'danger', '🚨');
+        }).catch(err => {
+            btn.disabled = false;
+            toast('Error al activar alarma', 'danger', '❌');
+            console.error(err);
         });
-        $('modal-alert').classList.add('hidden');
-        toast('¡Alarma activada! Tu comunidad ha sido alertada.', 'danger', '🚨');
     });
 
     // ===== Deactivate =====
@@ -411,25 +420,26 @@
         const btn = $('btn-deactivate');
         btn.disabled = true;
         
-        alertsRef.once('value', snap => {
+        // Find the active alert for this user in the local real-time cache
+        const alertsList = Object.entries(alertsCache);
+        const myActiveEntry = alertsList.find(([k, v]) => v.userId === currentUser.id && v.active);
+        
+        if (myActiveEntry) {
+            const firebaseKey = myActiveEntry[0];
+            alertsRef.child(firebaseKey).update({ active: false }).then(() => {
+                btn.disabled = false;
+                toast('Alarma desactivada', 'success', '✅');
+            }).catch(err => {
+                btn.disabled = false;
+                toast('Error al desactivar', 'danger', '❌');
+                console.error(err);
+            });
+        } else {
             btn.disabled = false;
-            const alerts = snap.val() || {};
-            const myActiveAlert = Object.entries(alerts).find(([k, v]) => v.userId === currentUser.id && v.active);
-            
-            if (myActiveAlert) {
-                alertsRef.child(myActiveAlert[0]).update({ active: false }).then(() => {
-                    toast('Alarma desactivada', 'success', '✅');
-                }).catch(err => {
-                    toast('Error al desactivar', 'danger', '❌');
-                    console.error(err);
-                });
-            } else {
-                toast('No tienes ninguna alarma activa para desactivar', 'info', 'ℹ️');
-            }
-        }).catch(err => {
-            btn.disabled = false;
-            toast('Error de conexión', 'danger', '❌');
-        });
+            toast('No tienes ninguna alarma activa para desactivar', 'info', 'ℹ️');
+            // Force re-render just in case UI is stuck
+            renderDashboard();
+        }
     });
 
     // ===== Detail Modal =====
