@@ -255,13 +255,29 @@
             feed.innerHTML = '';
             badge.textContent = otherAlerts.length;
             badge.classList.remove('hidden');
+            
+            let unrespondedAlertsCount = 0;
+            
             otherAlerts.sort((a, b) => b.timestamp - a.timestamp).forEach(alert => {
                 feed.appendChild(createAlertCard(alert));
+                
+                // Check if the current user has NOT yet responded to this alert
+                const responses = alert.responses ? Object.values(alert.responses) : [];
+                const hasResponded = responses.some(r => r.userId === currentUser.id);
+                if (!hasResponded) {
+                    unrespondedAlertsCount++;
+                }
             });
-            // Play siren for receivers too
+            
+            // Play siren and show flashing overlay ONLY if there are alerts we haven't responded to
             if (!myAlert) {
-                $('alarm-overlay').classList.remove('hidden');
-                SoundManager.startSiren();
+                if (unrespondedAlertsCount > 0) {
+                    $('alarm-overlay').classList.remove('hidden');
+                    SoundManager.startSiren();
+                } else {
+                    $('alarm-overlay').classList.add('hidden');
+                    SoundManager.stopSiren();
+                }
             }
         }
 
@@ -300,10 +316,13 @@
     // ===== Alert Card =====
     function createAlertCard(alert) {
         const card = document.createElement('div');
-        card.className = 'alert-card';
+        const responses = alert.responses ? Object.values(alert.responses) : [];
+        const hasResponded = responses.some(r => r.userId === currentUser.id);
+        
+        card.className = hasResponded ? 'alert-card responded' : 'alert-card';
+        
         const initials = alert.userName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
         const time = getRelativeTime(alert.timestamp);
-        const responses = alert.responses ? Object.values(alert.responses) : [];
         const respCount = responses.length;
 
         card.innerHTML = `
@@ -312,7 +331,7 @@
                     <div class="alert-avatar">${initials}</div>
                     <div class="alert-user-info">
                         <strong>${escHtml(alert.userName)}</strong>
-                        <span>Alerta activa</span>
+                        <span>${hasResponded ? 'Alerta respondida' : 'Alerta activa'}</span>
                     </div>
                 </div>
                 <span class="alert-time">${time}</span>
