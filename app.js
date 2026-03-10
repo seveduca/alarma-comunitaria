@@ -430,7 +430,7 @@
         
         // Find the active alert for this user in the local real-time cache
         const alertsList = Object.entries(alertsCache);
-        const myActiveEntry = alertsList.find(([k, v]) => v.userId === currentUser.id && v.active);
+        const myActiveEntry = alertsList.find(([k, v]) => v.userId === currentUser.id && v.active === true);
         
         if (myActiveEntry) {
             const firebaseKey = myActiveEntry[0];
