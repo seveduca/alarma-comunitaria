@@ -246,14 +246,16 @@
         const empty = $('feed-empty');
         const badge = $('alert-count-badge');
 
+        // Safely remove existing alert cards without destroying the empty placeholder
+        Array.from(feed.children).forEach(child => {
+            if (child.id !== 'feed-empty') feed.removeChild(child);
+        });
+
         if (otherAlerts.length === 0) {
-            feed.innerHTML = '';
-            feed.appendChild(empty);
             empty.style.display = '';
             badge.classList.add('hidden');
         } else {
             empty.style.display = 'none';
-            feed.innerHTML = '';
             badge.textContent = otherAlerts.length;
             badge.classList.remove('hidden');
             
