@@ -1,38 +1,44 @@
 /* ========================================
-   SISTEMA DE ALARMA COMUNITARIA - App Logic
+   SISTEMA DE ALARMA COMUNITARIA
+   App Logic with Firebase Realtime Database
    ======================================== */
 
 (function() {
     'use strict';
 
-    // ===== Storage Keys =====
-    const KEYS = {
-        USERS: 'ac_users',
-        SESSION: 'ac_session',
-        ALERTS: 'ac_alerts'
+    // ===== Firebase Config =====
+    const firebaseConfig = {
+        apiKey: "AIzaSyCQE5FdJkPGXI5hXkH9ImLWhdcbzUvUu8g",
+        authDomain: "alarma-comunitaria-4a6dd.firebaseapp.com",
+        databaseURL: "https://alarma-comunitaria-4a6dd-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "alarma-comunitaria-4a6dd",
+        storageBucket: "alarma-comunitaria-4a6dd.firebasestorage.app",
+        messagingSenderId: "887856789718",
+        appId: "1:887856789718:web:03c45bd5d65a5a29dcb177"
     };
 
-    // ===== BroadcastChannel for cross-tab sync =====
-    let channel;
-    try { channel = new BroadcastChannel('alarm_community'); } catch(e) { channel = null; }
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const alertsRef = db.ref('alerts');
+    const usersRef = db.ref('users');
+
+    // ===== Local session =====
+    const SESSION_KEY = 'ac_session';
+    function getSession() { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }
+    function saveSession(user) { localStorage.setItem(SESSION_KEY, JSON.stringify(user)); }
+    function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
     // ===== Sound Manager =====
     const SoundManager = {
-        ctx: null,
-        playing: false,
-        nodes: [],
-        init() {
-            if (!this.ctx) {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        },
+        ctx: null, playing: false, nodes: [],
+        init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
         startSiren() {
             this.init();
             if (this.playing) return;
             this.playing = true;
-            this._playSirenLoop();
+            this._loop();
         },
-        _playSirenLoop() {
+        _loop() {
             if (!this.playing) return;
             const ctx = this.ctx;
             const osc = ctx.createOscillator();
@@ -45,12 +51,10 @@
             gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.3);
             gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.7);
             gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 1.0);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1.0);
             this.nodes.push(osc, gain);
-            setTimeout(() => { if (this.playing) this._playSirenLoop(); }, 1050);
+            setTimeout(() => { if (this.playing) this._loop(); }, 1050);
         },
         stopSiren() {
             this.playing = false;
@@ -59,39 +63,10 @@
         }
     };
 
-    // ===== Data Helpers =====
-    function getUsers() {
-        return JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    }
-    function saveUsers(users) {
-        localStorage.setItem(KEYS.USERS, JSON.stringify(users));
-    }
-    function getSession() {
-        return JSON.parse(localStorage.getItem(KEYS.SESSION) || 'null');
-    }
-    function saveSession(user) {
-        localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
-    }
-    function clearSession() {
-        localStorage.removeItem(KEYS.SESSION);
-    }
-    function getAlerts() {
-        return JSON.parse(localStorage.getItem(KEYS.ALERTS) || '[]');
-    }
-    function saveAlerts(alerts) {
-        localStorage.setItem(KEYS.ALERTS, JSON.stringify(alerts));
-        if (channel) channel.postMessage({ type: 'alerts_updated' });
-    }
-
-    // ===== DOM References =====
+    // ===== DOM =====
     const $ = id => document.getElementById(id);
-    const views = {
-        login: $('view-login'),
-        register: $('view-register'),
-        dashboard: $('view-dashboard')
-    };
+    const views = { login: $('view-login'), register: $('view-register'), dashboard: $('view-dashboard') };
 
-    // ===== View Management =====
     function showView(name) {
         Object.values(views).forEach(v => v.classList.remove('active'));
         views[name].classList.add('active');
@@ -104,13 +79,10 @@
         el.className = `toast toast-${type}`;
         el.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
         container.appendChild(el);
-        setTimeout(() => {
-            el.classList.add('toast-exit');
-            setTimeout(() => el.remove(), 300);
-        }, 3500);
+        setTimeout(() => { el.classList.add('toast-exit'); setTimeout(() => el.remove(), 300); }, 3500);
     }
 
-    // ===== Auth =====
+    // ===== Auth (Firebase-backed) =====
     $('link-to-register').addEventListener('click', e => { e.preventDefault(); showView('register'); });
     $('link-to-login').addEventListener('click', e => { e.preventDefault(); showView('login'); });
 
@@ -118,12 +90,17 @@
         e.preventDefault();
         const username = $('login-username').value.trim();
         const password = $('login-password').value;
-        const users = getUsers();
-        const user = users.find(u => u.username === username && u.password === password);
-        if (!user) { toast('Usuario o contraseña incorrectos', 'danger', '❌'); return; }
-        saveSession(user);
-        $('form-login').reset();
-        enterDashboard(user);
+        usersRef.orderByChild('username').equalTo(username).once('value', snap => {
+            const data = snap.val();
+            if (!data) { toast('Usuario no encontrado', 'danger', '❌'); return; }
+            const key = Object.keys(data)[0];
+            const user = data[key];
+            if (user.password !== password) { toast('Contraseña incorrecta', 'danger', '❌'); return; }
+            user.id = key;
+            saveSession(user);
+            $('form-login').reset();
+            enterDashboard(user);
+        });
     });
 
     $('form-register').addEventListener('submit', e => {
@@ -133,15 +110,18 @@
         const username = $('reg-username').value.trim();
         const password = $('reg-password').value;
         if (password.length < 4) { toast('La contraseña debe tener al menos 4 caracteres', 'danger', '❌'); return; }
-        const users = getUsers();
-        if (users.find(u => u.username === username)) { toast('Ese nombre de usuario ya existe', 'danger', '❌'); return; }
-        const user = { id: Date.now().toString(), name, address, username, password };
-        users.push(user);
-        saveUsers(users);
-        saveSession(user);
-        $('form-register').reset();
-        toast('¡Cuenta creada exitosamente!', 'success', '✅');
-        enterDashboard(user);
+
+        usersRef.orderByChild('username').equalTo(username).once('value', snap => {
+            if (snap.val()) { toast('Ese nombre de usuario ya existe', 'danger', '❌'); return; }
+            const newRef = usersRef.push();
+            const user = { name, address, username, password };
+            newRef.set(user);
+            user.id = newRef.key;
+            saveSession(user);
+            $('form-register').reset();
+            toast('¡Cuenta creada exitosamente!', 'success', '✅');
+            enterDashboard(user);
+        });
     });
 
     $('btn-logout').addEventListener('click', () => {
@@ -153,18 +133,29 @@
 
     // ===== Dashboard =====
     let currentUser = null;
+    let alertsCache = {};
 
     function enterDashboard(user) {
         currentUser = user;
         $('navbar-user').textContent = user.name;
         showView('dashboard');
-        refreshDashboard();
+        listenToAlerts();
     }
 
-    function refreshDashboard() {
+    // ===== Real-time listener =====
+    function listenToAlerts() {
+        alertsRef.on('value', snap => {
+            alertsCache = snap.val() || {};
+            renderDashboard();
+        });
+    }
+
+    function renderDashboard() {
         if (!currentUser) return;
-        const alerts = getAlerts();
-        const myAlert = alerts.find(a => a.userId === currentUser.id && a.active);
+
+        const alertsList = Object.entries(alertsCache).map(([key, val]) => ({ ...val, firebaseKey: key }));
+        const myAlert = alertsList.find(a => a.userId === currentUser.id && a.active);
+        const otherAlerts = alertsList.filter(a => a.userId !== currentUser.id && a.active);
 
         // My alarm banner
         const banner = $('my-alarm-banner');
@@ -176,12 +167,9 @@
             SoundManager.startSiren();
         } else {
             banner.classList.add('hidden');
-            $('alarm-overlay').classList.add('hidden');
-            SoundManager.stopSiren();
         }
 
-        // Feed - show other users' active alerts
-        const otherAlerts = alerts.filter(a => a.userId !== currentUser.id && a.active);
+        // Feed
         const feed = $('alerts-feed');
         const empty = $('feed-empty');
         const badge = $('alert-count-badge');
@@ -199,14 +187,14 @@
             otherAlerts.sort((a, b) => b.timestamp - a.timestamp).forEach(alert => {
                 feed.appendChild(createAlertCard(alert));
             });
-            // Play siren for receiver too if there are active alerts
-            if (!myAlert && otherAlerts.length > 0) {
+            // Play siren for receivers too
+            if (!myAlert) {
                 $('alarm-overlay').classList.remove('hidden');
                 SoundManager.startSiren();
             }
         }
 
-        // If no alerts at all, stop everything
+        // If no alerts at all
         if (!myAlert && otherAlerts.length === 0) {
             $('alarm-overlay').classList.add('hidden');
             SoundManager.stopSiren();
@@ -216,14 +204,13 @@
     function renderMyAlarmResponses(alert) {
         const container = $('my-alarm-responses');
         container.innerHTML = '';
-        if (!alert.responses || alert.responses.length === 0) {
+        const responses = alert.responses ? Object.values(alert.responses) : [];
+        if (responses.length === 0) {
             container.innerHTML = '<span style="font-size:0.82rem;color:var(--text-muted)">Esperando respuestas de la comunidad...</span>';
             return;
         }
         const counts = {};
-        alert.responses.forEach(r => {
-            counts[r.action] = (counts[r.action] || 0) + 1;
-        });
+        responses.forEach(r => { counts[r.action] = (counts[r.action] || 0) + 1; });
         Object.entries(counts).forEach(([action, count]) => {
             const tag = document.createElement('div');
             tag.className = 'response-tag';
@@ -238,7 +225,8 @@
         card.className = 'alert-card';
         const initials = alert.userName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
         const time = getRelativeTime(alert.timestamp);
-        const respCount = (alert.responses || []).length;
+        const responses = alert.responses ? Object.values(alert.responses) : [];
+        const respCount = responses.length;
 
         card.innerHTML = `
             <div class="alert-card-header">
@@ -258,7 +246,7 @@
                 <button class="alert-view-btn">Ver detalle →</button>
             </div>
         `;
-        card.addEventListener('click', () => openDetailModal(alert.id));
+        card.addEventListener('click', () => openDetailModal(alert.firebaseKey));
         return card;
     }
 
@@ -266,9 +254,8 @@
     let selectedCause = null;
 
     $('btn-panic').addEventListener('click', () => {
-        // Check if user already has active alarm
-        const alerts = getAlerts();
-        if (alerts.find(a => a.userId === currentUser.id && a.active)) {
+        const alertsList = Object.entries(alertsCache).map(([k, v]) => ({ ...v, firebaseKey: k }));
+        if (alertsList.find(a => a.userId === currentUser.id && a.active)) {
             toast('Ya tienes una alarma activa', 'danger', '⚠️');
             return;
         }
@@ -299,13 +286,8 @@
 
     $('custom-cause').addEventListener('input', e => {
         const val = e.target.value.trim();
-        if (val.length > 0) {
-            selectedCause = val;
-            $('btn-confirm-alert').disabled = false;
-        } else {
-            selectedCause = null;
-            $('btn-confirm-alert').disabled = true;
-        }
+        selectedCause = val.length > 0 ? val : null;
+        $('btn-confirm-alert').disabled = !selectedCause;
     });
 
     $('modal-close').addEventListener('click', () => $('modal-alert').classList.add('hidden'));
@@ -314,51 +296,44 @@
 
     $('btn-confirm-alert').addEventListener('click', () => {
         if (!selectedCause) return;
-        const alert = {
-            id: Date.now().toString(),
+        const newAlertRef = alertsRef.push();
+        newAlertRef.set({
             userId: currentUser.id,
             userName: currentUser.name,
             address: currentUser.address,
             cause: selectedCause,
             timestamp: Date.now(),
-            active: true,
-            responses: []
-        };
-        const alerts = getAlerts();
-        alerts.push(alert);
-        saveAlerts(alerts);
+            active: true
+        });
         $('modal-alert').classList.add('hidden');
         toast('¡Alarma activada! Tu comunidad ha sido alertada.', 'danger', '🚨');
-        refreshDashboard();
     });
 
-    // ===== Deactivate Alarm =====
+    // ===== Deactivate =====
     $('btn-deactivate').addEventListener('click', () => {
-        const alerts = getAlerts();
-        const idx = alerts.findIndex(a => a.userId === currentUser.id && a.active);
-        if (idx !== -1) {
-            alerts[idx].active = false;
-            saveAlerts(alerts);
+        const alertsList = Object.entries(alertsCache).map(([k, v]) => ({ ...v, firebaseKey: k }));
+        const myAlert = alertsList.find(a => a.userId === currentUser.id && a.active);
+        if (myAlert) {
+            alertsRef.child(myAlert.firebaseKey).update({ active: false });
             toast('Alarma desactivada', 'success', '✅');
-            refreshDashboard();
         }
     });
 
     // ===== Detail Modal =====
-    function openDetailModal(alertId) {
-        const alerts = getAlerts();
-        const alert = alerts.find(a => a.id === alertId);
+    function openDetailModal(firebaseKey) {
+        const alert = alertsCache[firebaseKey];
         if (!alert) return;
 
         const body = $('detail-body');
         const actions = $('detail-actions');
         const time = new Date(alert.timestamp).toLocaleString('es-CL');
+        const responses = alert.responses ? Object.values(alert.responses) : [];
 
         let responsesHtml = '';
-        if (alert.responses && alert.responses.length > 0) {
+        if (responses.length > 0) {
             const colorMap = { 'Voy en camino': 'green', 'Pide más antecedentes': 'blue', 'Llamé a Carabineros': 'orange', 'Llamé a Bomberos': 'purple', '¿Estás bien?': 'yellow' };
             responsesHtml = `<div class="detail-responses-section"><h3>Respuestas</h3><div class="detail-response-list">`;
-            alert.responses.forEach(r => {
+            responses.forEach(r => {
                 const c = colorMap[r.action] || 'green';
                 responsesHtml += `<div class="detail-response-item"><span class="resp-user">${escHtml(r.userName)}</span><span class="resp-action ${c}">${escHtml(r.action)}</span></div>`;
             });
@@ -375,8 +350,7 @@
             ${responsesHtml}
         `;
 
-        // Check if current user already responded
-        const alreadyResponded = alert.responses && alert.responses.find(r => r.userId === currentUser.id);
+        const alreadyResponded = responses.find(r => r.userId === currentUser.id);
         const isOwner = alert.userId === currentUser.id;
 
         if (isOwner) {
@@ -392,13 +366,10 @@
                 { action: '¿Estás bien?', icon: '💬', cls: 'a-ok' }
             ];
             actions.innerHTML = btns.map(b =>
-                `<button class="action-btn ${b.cls}" data-alert-id="${alertId}" data-action="${b.action}">${b.icon} ${b.action}</button>`
+                `<button class="action-btn ${b.cls}" data-fkey="${firebaseKey}" data-action="${b.action}">${b.icon} ${b.action}</button>`
             ).join('');
-
             actions.querySelectorAll('.action-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    respondToAlert(btn.dataset.alertId, btn.dataset.action);
-                });
+                btn.addEventListener('click', () => respondToAlert(btn.dataset.fkey, btn.dataset.action));
             });
         }
 
@@ -408,45 +379,26 @@
     $('detail-close').addEventListener('click', () => $('modal-detail').classList.add('hidden'));
     $('modal-detail').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-detail').classList.add('hidden'));
 
-    function respondToAlert(alertId, action) {
-        const alerts = getAlerts();
-        const alert = alerts.find(a => a.id === alertId);
+    function respondToAlert(firebaseKey, action) {
+        const alert = alertsCache[firebaseKey];
         if (!alert) return;
-        if (!alert.responses) alert.responses = [];
-        if (alert.responses.find(r => r.userId === currentUser.id)) {
+        const responses = alert.responses ? Object.values(alert.responses) : [];
+        if (responses.find(r => r.userId === currentUser.id)) {
             toast('Ya respondiste a esta alerta', 'info', 'ℹ️');
             return;
         }
-        alert.responses.push({
+        alertsRef.child(firebaseKey).child('responses').push({
             userId: currentUser.id,
             userName: currentUser.name,
             action: action,
             timestamp: Date.now()
         });
-        saveAlerts(alerts);
         $('modal-detail').classList.add('hidden');
         toast(`Respuesta enviada: ${action}`, 'success', '✅');
-        refreshDashboard();
     }
-
-    // ===== Cross-tab sync =====
-    if (channel) {
-        channel.onmessage = (e) => {
-            if (e.data.type === 'alerts_updated') {
-                refreshDashboard();
-            }
-        };
-    }
-    // Fallback: poll localStorage every 2 seconds
-    setInterval(() => { if (currentUser) refreshDashboard(); }, 2000);
 
     // ===== Helpers =====
-    function escHtml(str) {
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-    }
-
+    function escHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
     function getRelativeTime(ts) {
         const diff = Math.floor((Date.now() - ts) / 1000);
         if (diff < 10) return 'Ahora';
@@ -458,10 +410,7 @@
 
     // ===== Init =====
     const session = getSession();
-    if (session) {
-        enterDashboard(session);
-    } else {
-        showView('login');
-    }
+    if (session) { enterDashboard(session); }
+    else { showView('login'); }
 
 })();
