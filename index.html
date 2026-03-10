@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de Alarma Comunitaria - Protege tu vecindario con alertas en tiempo real y respuesta comunitaria.">
+    <title>Alarma Comunitaria | Protege tu Vecindario</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- ========== ALARM OVERLAY (red flashing) ========== -->
+    <div id="alarm-overlay" class="alarm-overlay hidden"></div>
+
+    <!-- ========== LOGIN VIEW ========== -->
+    <section id="view-login" class="view active">
+        <div class="auth-container">
+            <div class="auth-logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3"/>
+                        <path d="M32 16V34L42 40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="32" cy="10" r="3" fill="currentColor"/>
+                        <path d="M22 8L32 4L42 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h1>Alarma Comunitaria</h1>
+                <p class="auth-subtitle">Protege tu vecindario en tiempo real</p>
+            </div>
+            <form id="form-login" class="auth-form" autocomplete="off">
+                <div class="form-group">
+                    <label for="login-username">Nombre de usuario</label>
+                    <input type="text" id="login-username" placeholder="Tu nombre de usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" placeholder="Tu contraseña" required>
+                </div>
+                <button type="submit" id="btn-login" class="btn btn-primary btn-full">Iniciar Sesión</button>
+                <p class="auth-switch">¿No tienes cuenta? <a href="#" id="link-to-register">Regístrate aquí</a></p>
+            </form>
+        </div>
+    </section>
+
+    <!-- ========== REGISTER VIEW ========== -->
+    <section id="view-register" class="view">
+        <div class="auth-container">
+            <div class="auth-logo">
+                <div class="logo-icon small">
+                    <svg viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3"/>
+                        <path d="M32 16V34L42 40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="32" cy="10" r="3" fill="currentColor"/>
+                        <path d="M22 8L32 4L42 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h1>Crear Cuenta</h1>
+                <p class="auth-subtitle">Únete a tu comunidad segura</p>
+            </div>
+            <form id="form-register" class="auth-form" autocomplete="off">
+                <div class="form-group">
+                    <label for="reg-name">Nombre completo</label>
+                    <input type="text" id="reg-name" placeholder="Ej: María González" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-address">Dirección</label>
+                    <input type="text" id="reg-address" placeholder="Ej: Av. Libertad 123, Depto 4B" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-username">Nombre de usuario</label>
+                    <input type="text" id="reg-username" placeholder="Elige un nombre de usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Contraseña</label>
+                    <input type="password" id="reg-password" placeholder="Mínimo 4 caracteres" required minlength="4">
+                </div>
+                <button type="submit" id="btn-register" class="btn btn-primary btn-full">Registrarse</button>
+                <p class="auth-switch">¿Ya tienes cuenta? <a href="#" id="link-to-login">Inicia sesión</a></p>
+            </form>
+        </div>
+    </section>
+
+    <!-- ========== DASHBOARD VIEW ========== -->
+    <section id="view-dashboard" class="view">
+        <!-- Top navbar -->
+        <header class="navbar">
+            <div class="navbar-left">
+                <div class="navbar-logo">
+                    <svg viewBox="0 0 64 64" fill="none" width="28" height="28">
+                        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3"/>
+                        <path d="M32 16V34L42 40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="32" cy="10" r="3" fill="currentColor"/>
+                        <path d="M22 8L32 4L42 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <span class="navbar-title">Alarma Comunitaria</span>
+            </div>
+            <div class="navbar-right">
+                <span id="navbar-user" class="navbar-user"></span>
+                <button id="btn-logout" class="btn btn-ghost btn-sm">Salir</button>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="dashboard-content">
+            <!-- Panic button section -->
+            <div class="panic-section">
+                <div class="panic-ring ring-3"></div>
+                <div class="panic-ring ring-2"></div>
+                <div class="panic-ring ring-1"></div>
+                <button id="btn-panic" class="btn-panic" aria-label="Activar alarma de emergencia">
+                    <svg viewBox="0 0 80 80" fill="none" class="panic-icon">
+                        <path d="M40 8L44 28H56L46 38L50 58L40 48L30 58L34 38L24 28H36L40 8Z" fill="currentColor"/>
+                    </svg>
+                    <span>ALARMA</span>
+                </button>
+                <p class="panic-hint">Presiona para emitir una alerta de emergencia</p>
+            </div>
+
+            <!-- Active user alarm banner -->
+            <div id="my-alarm-banner" class="my-alarm-banner hidden">
+                <div class="my-alarm-info">
+                    <span class="my-alarm-pulse"></span>
+                    <div>
+                        <strong>Tu alarma está activa</strong>
+                        <p id="my-alarm-cause"></p>
+                    </div>
+                </div>
+                <div class="my-alarm-responses" id="my-alarm-responses"></div>
+                <button id="btn-deactivate" class="btn btn-danger btn-sm">Desactivar Alarma</button>
+            </div>
+
+            <!-- Alerts feed -->
+            <div class="feed-section">
+                <h2 class="feed-title">
+                    <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z" fill="currentColor"/>
+                    </svg>
+                    Alertas de la Comunidad
+                    <span id="alert-count-badge" class="badge hidden">0</span>
+                </h2>
+                <div id="alerts-feed" class="alerts-feed">
+                    <div class="feed-empty" id="feed-empty">
+                        <svg viewBox="0 0 80 80" fill="none" width="60" height="60">
+                            <circle cx="40" cy="40" r="35" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+                            <path d="M28 45C28 45 33 52 40 52C47 52 52 45 52 45" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+                            <circle cx="30" cy="35" r="3" fill="currentColor" opacity="0.3"/>
+                            <circle cx="50" cy="35" r="3" fill="currentColor" opacity="0.3"/>
+                        </svg>
+                        <p>Todo está tranquilo en tu comunidad</p>
+                        <span>Las alertas aparecerán aquí</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </section>
+
+    <!-- ========== ALERT CREATION MODAL ========== -->
+    <div id="modal-alert" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🚨 Emitir Alerta</h2>
+                <button id="modal-close" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Selecciona el motivo de tu alerta. Tu dirección y nombre serán compartidos con la comunidad.</p>
+                <div class="cause-grid" id="cause-grid">
+                    <button class="cause-btn" data-cause="Robo / Asalto">
+                        <span class="cause-icon">🦹</span>
+                        <span class="cause-label">Robo / Asalto</span>
+                    </button>
+                    <button class="cause-btn" data-cause="Incendio">
+                        <span class="cause-icon">🔥</span>
+                        <span class="cause-label">Incendio</span>
+                    </button>
+                    <button class="cause-btn" data-cause="Emergencia Médica">
+                        <span class="cause-icon">🏥</span>
+                        <span class="cause-label">Emergencia Médica</span>
+                    </button>
+                    <button class="cause-btn" data-cause="Persona Sospechosa">
+                        <span class="cause-icon">👤</span>
+                        <span class="cause-label">Persona Sospechosa</span>
+                    </button>
+                    <button class="cause-btn" data-cause="Accidente de Tránsito">
+                        <span class="cause-icon">🚗</span>
+                        <span class="cause-label">Accidente de Tránsito</span>
+                    </button>
+                    <button class="cause-btn" data-cause="Otro">
+                        <span class="cause-icon">⚠️</span>
+                        <span class="cause-label">Otro</span>
+                    </button>
+                </div>
+                <div id="custom-cause-wrap" class="custom-cause-wrap hidden">
+                    <label for="custom-cause">Describe la situación:</label>
+                    <textarea id="custom-cause" rows="3" placeholder="Describe brevemente lo que está pasando..."></textarea>
+                </div>
+                <div class="modal-warning">
+                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="currentColor"/>
+                    </svg>
+                    <span>Esta alerta será enviada a todos los miembros de tu comunidad.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-alert" class="btn btn-ghost">Cancelar</button>
+                <button id="btn-confirm-alert" class="btn btn-danger" disabled>
+                    <span class="btn-icon">🔔</span> Activar Alarma
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ALERT DETAIL MODAL ========== -->
+    <div id="modal-detail" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-detail-content">
+            <div class="modal-header modal-header-danger">
+                <h2>🚨 Detalle de Alerta</h2>
+                <button id="detail-close" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="detail-body">
+                <!-- Filled dynamically -->
+            </div>
+            <div class="modal-footer modal-footer-actions" id="detail-actions">
+                <!-- Filled dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== TOAST CONTAINER ========== -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
