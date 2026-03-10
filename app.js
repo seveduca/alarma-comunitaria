@@ -102,15 +102,28 @@
         e.preventDefault();
         const username = $('login-username').value.trim();
         const password = $('login-password').value;
-        usersRef.orderByChild('username').equalTo(username).once('value', snap => {
-            const data = snap.val();
-            if (!data) { toast('Usuario no encontrado', 'danger', '❌'); return; }
-            const key = Object.keys(data)[0];
-            const user = { ...data[key], id: key };
+        const btn = $('btn-login');
+        btn.disabled = true;
+        
+        usersRef.once('value', snap => {
+            btn.disabled = false;
+            const users = snap.val() || {};
+            const userEntry = Object.entries(users).find(([k, v]) => v.username === username);
+            
+            if (!userEntry) { toast('Usuario no encontrado', 'danger', '❌'); return; }
+            
+            const key = userEntry[0];
+            const user = { ...userEntry[1], id: key };
+            
             if (user.password !== password) { toast('Contraseña incorrecta', 'danger', '❌'); return; }
+            
             saveSession(user);
             $('form-login').reset();
             enterDashboard(user);
+        }).catch(err => {
+            btn.disabled = false;
+            toast('Error de conexión', 'danger', '❌');
+            console.error(err);
         });
     });
 
@@ -122,16 +135,38 @@
         const password = $('reg-password').value;
         if (password.length < 4) { toast('La contraseña debe tener al menos 4 caracteres', 'danger', '❌'); return; }
 
-        usersRef.orderByChild('username').equalTo(username).once('value', snap => {
-            if (snap.val()) { toast('Ese nombre de usuario ya existe', 'danger', '❌'); return; }
+        const btn = $('btn-register');
+        btn.disabled = true;
+
+        usersRef.once('value', snap => {
+            const users = snap.val() || {};
+            const exists = Object.values(users).some(u => u.username === username);
+            
+            if (exists) { 
+                btn.disabled = false;
+                toast('Ese nombre de usuario ya existe', 'danger', '❌'); 
+                return; 
+            }
+            
             const newRef = usersRef.push();
             const userData = { name, address, username, password };
-            newRef.set(userData);
-            const user = { ...userData, id: newRef.key };
-            saveSession(user);
-            $('form-register').reset();
-            toast('¡Cuenta creada exitosamente!', 'success', '✅');
-            enterDashboard(user);
+            
+            newRef.set(userData).then(() => {
+                btn.disabled = false;
+                const user = { ...userData, id: newRef.key };
+                saveSession(user);
+                $('form-register').reset();
+                toast('¡Cuenta creada exitosamente!', 'success', '✅');
+                enterDashboard(user);
+            }).catch(err => {
+                btn.disabled = false;
+                toast('Error al crear cuenta', 'danger', '❌');
+                console.error(err);
+            });
+        }).catch(err => {
+            btn.disabled = false;
+            toast('Error de conexión', 'danger', '❌');
+            console.error(err);
         });
     });
 
