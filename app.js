@@ -430,13 +430,14 @@
         const btn = $('btn-deactivate');
         btn.disabled = true;
         
-        // Find the active alert for this user in the local real-time cache
-        const alertsList = Object.entries(alertsCache);
-        const myActiveEntry = alertsList.find(([k, v]) => v.userId === currentUser.id && v.active === true);
+        // Find ALL active alerts for this user in the local real-time cache
+        const alertsList = Object.entries(alertsCache || {});
+        const myActiveEntries = alertsList.filter(([k, v]) => v && v.userId === currentUser.id && v.active === true);
         
-        if (myActiveEntry) {
-            const firebaseKey = myActiveEntry[0];
-            alertsRef.child(firebaseKey).update({ active: false }).then(() => {
+        if (myActiveEntries.length > 0) {
+            const updates = myActiveEntries.map(([k, v]) => alertsRef.child(k).update({ active: false }));
+            
+            Promise.all(updates).then(() => {
                 btn.disabled = false;
                 toast('Alarma desactivada', 'success', '✅');
             }).catch(err => {
