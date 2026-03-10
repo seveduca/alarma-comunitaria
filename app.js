@@ -217,16 +217,17 @@
     }
 
     function countOtherActiveAlerts(cache) {
-        if (!currentUser) return 0;
-        return Object.values(cache).filter(a => a.userId !== currentUser.id && a.active).length;
+        if (!currentUser || !cache) return 0;
+        return Object.values(cache).filter(a => a && a.userId !== currentUser.id && a.active).length;
     }
 
     function renderDashboard() {
         if (!currentUser) return;
-
-        const alertsList = Object.entries(alertsCache).map(([key, val]) => ({ ...val, firebaseKey: key }));
-        const myAlert = alertsList.find(a => a.userId === currentUser.id && a.active);
-        const otherAlerts = alertsList.filter(a => a.userId !== currentUser.id && a.active);
+        
+        const safeCache = alertsCache || {};
+        const alertsList = Object.entries(safeCache).map(([key, val]) => ({ ...val, firebaseKey: key }));
+        const myAlert = alertsList.find(a => a && a.userId === currentUser.id && a.active);
+        const otherAlerts = alertsList.filter(a => a && a.userId !== currentUser.id && a.active);
 
         // My alarm banner
         const banner = $('my-alarm-banner');
